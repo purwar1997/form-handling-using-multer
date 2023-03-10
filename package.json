@@ -1,0 +1,18 @@
+{
+  "name": "form-handling",
+  "version": "1.0.0",
+  "description": "An express.js project to handle form data (including files) using multer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "author": "Shubham Purwar",
+  "license": "ISC",
+  "dependencies": {
+    "cloudinary": "^1.35.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
