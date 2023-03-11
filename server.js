@@ -58,10 +58,9 @@ app.post('/api/upload', upload.array('profilePhotos', 5), async (req, res) => {
           const res = await cloudinary.uploader.upload(file.path, {
             folder: 'users',
             use_filename: true,
-            unique_filename: false,
-            overwrite: true,
+            unique_filename: true,
             resource_type: 'image',
-            tags: 'profileImages',
+            tags: ['profilePhotos'],
           });
 
           return { id: res.public_id, url: res.secure_url };
@@ -73,7 +72,7 @@ app.post('/api/upload', upload.array('profilePhotos', 5), async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Images uploaded successfully',
+      message: 'Images successfully uploaded',
       data: {
         name,
         email,
@@ -89,12 +88,12 @@ app.post('/api/upload', upload.array('profilePhotos', 5), async (req, res) => {
   }
 });
 
-app.get('/api/fetch/all', async (_req, res) => {
+app.get('/api/fetch', async (_req, res) => {
   try {
     const response = await cloudinary.api.resources({
       resource_type: 'image',
       type: 'upload',
-      prefix: 'users',
+      prefix: 'users/profilePhotos',
     });
 
     const images = response.resources.map(resource => {
@@ -110,20 +109,22 @@ app.get('/api/fetch/all', async (_req, res) => {
     console.log(err);
     res.status(400).json({
       success: false,
-      message: err.message,
+      message: err.message || err.error.message,
     });
   }
 });
 
-app.get('/api/fetch', async (req, res) => {
+app.get('/api/fetch/:id', async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id } = req.params;
 
     if (!id) {
-      throw new Error('Please provide public ID of image');
+      throw new Error('Please provide an id');
     }
 
-    const response = await cloudinary.api.resource(id, {
+    const publicId = 'users/profilePhotos_' + id;
+
+    const response = await cloudinary.api.resource(publicId, {
       resource_type: 'image',
     });
 
@@ -137,14 +138,16 @@ app.get('/api/fetch', async (req, res) => {
   } catch (err) {
     res.status(400).json({
       success: false,
-      message: err.message,
+      message: err.message || err.error.message,
     });
   }
 });
 
-app.delete('/api/delete/all', async (_req, res) => {
+app.delete('/api/delete', async (_req, res) => {
   try {
-    await cloudinary.api.delete_resources_by_prefix('users', { resource_type: 'image' });
+    await cloudinary.api.delete_resources_by_prefix('users/profilePhotos', {
+      resource_type: 'image',
+    });
 
     res.status(200).json({
       success: true,
@@ -153,20 +156,21 @@ app.delete('/api/delete/all', async (_req, res) => {
   } catch (err) {
     res.status(400).json({
       success: false,
-      message: err.message,
+      message: err.message || err.error.message,
     });
   }
 });
 
-app.delete('/api/delete', async (req, res) => {
+app.delete('/api/delete/:id', async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id } = req.params;
 
     if (!id) {
-      throw new Error('Please provide public ID of image');
+      throw new Error('Please provide an id');
     }
 
-    await cloudinary.uploader.destroy(id, { resource_type: 'image' });
+    const publicId = 'users/profilePhotos_' + id;
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
 
     res.status(200).json({
       success: true,
@@ -175,7 +179,7 @@ app.delete('/api/delete', async (req, res) => {
   } catch (err) {
     res.status(400).json({
       success: false,
-      message: err.message,
+      message: err.message || err.error.message,
     });
   }
 });
