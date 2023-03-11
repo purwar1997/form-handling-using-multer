@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const cloudinary = require('./config/cloudinary.config');
 const config = require('./config/config');
 
 const storage = multer.diskStorage({
@@ -33,10 +34,8 @@ app.get('/api', (_req, res) => {
   res.status(200).render('form.ejs');
 });
 
-app.post('/api/upload', upload.array('profilePhotos', 5), (req, res) => {
+app.post('/api/upload', upload.array('profilePhotos', 5), async (req, res) => {
   try {
-    console.log(req.body, req.files);
-
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Error('No field values were provided');
     }
@@ -51,14 +50,127 @@ app.post('/api/upload', upload.array('profilePhotos', 5), (req, res) => {
       throw new Error('No files were uploaded');
     }
 
+    let images;
+
+    try {
+      images = await Promise.all(
+        req.files.map(async file => {
+          const res = await cloudinary.uploader.upload(file.path, {
+            folder: 'users',
+            use_filename: true,
+            unique_filename: false,
+            overwrite: true,
+            resource_type: 'image',
+            tags: 'profileImages',
+          });
+
+          return { id: res.public_id, url: res.secure_url };
+        })
+      );
+    } catch (err) {
+      throw new Error('Failure uploading files to the cloudinary');
+    }
+
     res.status(200).json({
       success: true,
+      message: 'Images uploaded successfully',
       data: {
         name,
         email,
         password,
-        profilePhotos: req.files,
+        images,
       },
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.get('/api/fetch/all', async (_req, res) => {
+  try {
+    const response = await cloudinary.api.resources({
+      resource_type: 'image',
+      type: 'upload',
+      prefix: 'users',
+    });
+
+    const images = response.resources.map(resource => {
+      return { id: resource.public_id, url: resource.secure_url };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Images successfully fetched',
+      images,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.get('/api/fetch', async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    if (!id) {
+      throw new Error('Please provide public ID of image');
+    }
+
+    const response = await cloudinary.api.resource(id, {
+      resource_type: 'image',
+    });
+
+    const image = { id: response.public_id, url: response.secure_url };
+
+    res.status(200).json({
+      success: true,
+      message: 'Image successfully fetched',
+      image,
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.delete('/api/delete/all', async (_req, res) => {
+  try {
+    await cloudinary.api.delete_resources_by_prefix('users', { resource_type: 'image' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Images successfully deleted',
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.delete('/api/delete', async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    if (!id) {
+      throw new Error('Please provide public ID of image');
+    }
+
+    await cloudinary.uploader.destroy(id, { resource_type: 'image' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Image successfully deleted',
     });
   } catch (err) {
     res.status(400).json({
